@@ -2,6 +2,14 @@ import googleClient from "../config/google.js";
 import User from "../models/user.model.js";
 import createAccessToken from "../utils/createToken.js";
 
+const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+const redirectToLoginWithError = (response, errorCode) => {
+  const loginUrl = new URL("/", frontendUrl);
+  loginUrl.searchParams.set("error", errorCode);
+  return response.redirect(loginUrl.toString());
+};
+
 export const redirectToGoogleAuthorization = (request, response) => {
   const authorizationUrl = googleClient.generateAuthUrl({
     access_type: "offline",
@@ -16,17 +24,13 @@ export const handleGoogleOAuthCallback = async (request, response) => {
     const { code } = request.query;
 
     if (!code) {
-      return response.status(400).json({
-        message: "Authorization code is missing",
-      });
+      return redirectToLoginWithError(response, "missing_code");
     }
 
     const { tokens } = await googleClient.getToken(code);
 
     if (!tokens.id_token) {
-      return response.status(401).json({
-        message: "Google did not return an ID token",
-      });
+      return redirectToLoginWithError(response, "missing_id_token");
     }
 
     const ticket = await googleClient.verifyIdToken({
@@ -36,9 +40,7 @@ export const handleGoogleOAuthCallback = async (request, response) => {
     const verifiedIdentity = ticket.getPayload();
 
     if (!verifiedIdentity?.sub || !verifiedIdentity.email || !verifiedIdentity.name) {
-      return response.status(401).json({
-        message: "Google account information is incomplete",
-      });
+      return redirectToLoginWithError(response, "incomplete_account");
     }
 
     const { sub: googleId, email, name, picture } = verifiedIdentity;
@@ -61,21 +63,10 @@ export const handleGoogleOAuthCallback = async (request, response) => {
       maxAge: 15 * 60 * 1000,
     });
 
-    return response.json({
-      message: "Google login successful",
-      user: {
-        id: authenticatedUser._id,
-        googleId: authenticatedUser.googleId,
-        email: authenticatedUser.email,
-        name: authenticatedUser.name,
-        picture: authenticatedUser.picture,
-      },
-    });
+    return response.redirect(new URL("/dashboard", frontendUrl).toString());
   } catch (error) {
     console.error("Google OAuth callback error:", error);
 
-    return response.status(500).json({
-      message: "Google authentication failed",
-    });
+    return redirectToLoginWithError(response, "google_auth_failed");
   }
 };
