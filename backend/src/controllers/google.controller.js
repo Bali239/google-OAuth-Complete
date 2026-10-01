@@ -1,5 +1,7 @@
 import googleClient from "../config/google.js";
 import User from "../models/user.model.js";
+import { welcomeEmail } from "../emails/welcome.email.js";
+import { sendEmail } from "../services/email.service.js";
 import createAccessToken from "../utils/createToken.js";
 
 const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
@@ -53,6 +55,16 @@ export const handleGoogleOAuthCallback = async (request, response) => {
         name,
         picture,
       });
+    }
+
+    if (!authenticatedUser.welcomeEmailSentAt) {
+      try {
+        await sendEmail({ to: email, ...welcomeEmail(name) });
+        authenticatedUser.welcomeEmailSentAt = new Date();
+        await authenticatedUser.save();
+      } catch (emailError) {
+        console.error("Welcome email delivery failed:", emailError);
+      }
     }
 
     const accessToken = createAccessToken(authenticatedUser._id);
