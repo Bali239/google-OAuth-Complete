@@ -1,25 +1,19 @@
-import Router from "express"
-import { googleGenerateAuthUrl, googleCallback } from "../controllers/google.controller.js"
-import authMiddleware from "../middlewares/auth.middleware.js"
-import { getUser } from "../controllers/user.controller.js"
-const router = Router()
+import { Router } from "express";
+import {
+  handleGoogleOAuthCallback,
+  redirectToGoogleAuthorization,
+} from "../controllers/google.controller.js";
+import authenticateUser from "../middlewares/auth.middleware.js";
+import { getCurrentUser, logoutCurrentUser } from "../controllers/user.controller.js";
 
-router.get("/google", googleGenerateAuthUrl);
+const router = Router();
 
-router.get("/google/callback", googleCallback);
+router.get("/google", redirectToGoogleAuthorization);
 
-router.get("/api/auth/me", authMiddleware, getUser);
+router.get("/google/callback", handleGoogleOAuthCallback);
 
-router.post("/api/auth/logout", authMiddleware, (req, res) => {
-  res.clearCookie("accessToken", {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-  });
+router.get("/me", authenticateUser, getCurrentUser);
 
-  res.json({
-    message: "Logged out successfully",
-  });
-});
+router.post("/logout", authenticateUser, logoutCurrentUser);
 
 export default router;

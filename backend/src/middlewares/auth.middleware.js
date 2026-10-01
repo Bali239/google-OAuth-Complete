@@ -1,28 +1,34 @@
 import jwt from "jsonwebtoken";
 
-const authMiddleware = (req, res, next) => {
+const authenticateUser = (request, response, next) => {
   try {
-    const token = req.cookies.accessToken;
+    const accessToken = request.cookies?.accessToken;
 
-    if (!token) {
-      return res.status(401).json({
+    if (!accessToken) {
+      return response.status(401).json({
         message: "Authentication required",
       });
     }
 
-    const decoded = jwt.verify(
-      token,
+    const verifiedTokenPayload = jwt.verify(
+      accessToken,
       process.env.JWT_SECRET
     );
 
-    req.userId = decoded.userId;
+    if (typeof verifiedTokenPayload === "string" || !verifiedTokenPayload.userId) {
+      return response.status(401).json({
+        message: "Invalid or expired authentication token",
+      });
+    }
+
+    request.authenticatedUserId = verifiedTokenPayload.userId;
 
     next();
-  } catch (error) {
-    return res.status(401).json({
+  } catch {
+    return response.status(401).json({
       message: "Invalid or expired authentication token",
     });
   }
 };
 
-export default authMiddleware;
+export default authenticateUser;
